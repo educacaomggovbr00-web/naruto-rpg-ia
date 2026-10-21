@@ -5,6 +5,7 @@ A chave é lida do ambiente ou digitada sem eco e NÃO é gravada em arquivos.
 Este programa NÃO extrai, renova ou prevê tokens do Discord.
 """
 
+import fcntl
 import getpass
 import os
 import queue
@@ -13,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 API = "https://discord.com/api/v10/users/@me"
@@ -98,6 +100,30 @@ def encerrar_processo(processo):
         processo.kill()
         processo.wait(timeout=5)
 
+def obter_bloqueio():
+    """Impede duas instâncias do reconector no mesmo Codespaces."""
+    pasta = Path.home() / ".cache" / "naruto-rpg-ia"
+    try:
+        pasta.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(str(pasta / "reconector.lock"), os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(fd)
+            print("⚠️  Já existe um reconector aberto. Use a aba daquele terminal.")
+            return None
+        return fd
+    except OSError as erro:
+        print(f"Não foi possível iniciar o reconector: {erro}")
+        return None
+
+
+def perguntar(texto):
+    try:
+        return input(texto).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return "s"
+
 
 def iniciar():
     if not shutil.which("curl") or not shutil.which("opencode"):
@@ -105,6 +131,7 @@ def iniciar():
         return 1
     projeto = Path(__file__).resolve().parent.parent
     token = os.environ.get("DISCORD_TOKEN", "").strip() or None
+    falhas_seguidas = 0
     while True:
         token = escolher_token(token)
         if token is None:
@@ -132,26 +159,56 @@ def iniciar():
         except KeyboardInterrupt:
             print("\nEncerrando OpenCode...")
             encerrar_processo(processo)
+            return 0
         finally:
             parar.set()
             vigia.join(timeout=1)
         if falha:
+            falhas_seguidas = 0
             print(f"\n🛑 Discord retornou HTTP {falha}. Pausando o OpenCode para evitar ações repetidas.", flush=True)
             encerrar_processo(processo)
             if falha == "401":
                 token = None  # pedir nova chave; nunca tentar extraí-la do navegador
                 continue
-            try:
-                resposta = input("[t] verificar novamente, [n] nova chave, [s] sair: ").strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                return 0
+            resposta = perguntar("[t] verificar novamente, [n] nova chave, [s] sair: ")
             if resposta == "t":
                 continue
             if resposta == "n":
                 token = None
                 continue
-        return processo.returncode or 0
+            return 0
+
+        codigo = processo.returncode
+        if codigo == 0:
+            falhas_seguidas = 0
+            print("\nℹ️  O OpenCode foi fechado, mas o reconector continua aberto.")
+            print("Não precisa informar a chave outra vez se ela ainda estiver válida.")
+            if perguntar("[r] reabrir OpenCode, [s] sair: ") == "r":
+                continue
+            return 0
+
+        falhas_seguidas += 1
+        print(f"\n⚠️  OpenCode encerrou com código {codigo}.", flush=True)
+        if falhas_seguidas <= 2:
+            print("Tentando abrir novamente em 3 segundos...", flush=True)
+            time.sleep(3)
+            continue
+        print("O OpenCode falhou 3 vezes. Parei para não criar um ciclo infinito.")
+        falhas_seguidas = 0
+        if perguntar("[r] tentar novamente, [s] sair: ") == "r":
+            continue
+        return codigo or 1
+
+
+def main():
+    bloqueio = obter_bloqueio()
+    if bloqueio is None:
+        return 2
+    try:
+        return iniciar()
+    finally:
+        os.close(bloqueio)
 
 
 if __name__ == "__main__":
-    sys.exit(iniciar())
+    sys.exit(main())
