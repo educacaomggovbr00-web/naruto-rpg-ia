@@ -1,0 +1,153 @@
+## [1.8.1](https://github.com/Microck/discord.py-self-mcp/compare/v1.8.0...v1.8.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* remove strict-validator-incompatible tool schema branches ([#50](https://github.com/Microck/discord.py-self-mcp/issues/50)) ([2a7db31](https://github.com/Microck/discord.py-self-mcp/commit/2a7db3143bff0aced5d3d081704cd72b7e23ead6))
+
+# [1.8.0](https://github.com/Microck/discord.py-self-mcp/compare/v1.7.0...v1.8.0) (2026-09-07)
+
+
+### Features
+
+* add Discord pings and unread DM tools ([#48](https://github.com/Microck/discord.py-self-mcp/issues/48)) ([cbd446f](https://github.com/Microck/discord.py-self-mcp/commit/cbd446fcdaa3618ac7d58a01e78ba5b4261821ee))
+
+# [1.7.0](https://github.com/Microck/discord.py-self-mcp/compare/v1.6.0...v1.7.0) (2026-09-07)
+
+
+### Features
+
+* add server sidebar analysis and streamable HTTP ([#47](https://github.com/Microck/discord.py-self-mcp/issues/47)) ([cf12064](https://github.com/Microck/discord.py-self-mcp/commit/cf1206441a0e34ffbe98a9f5ad36b4ed88a14090))
+
+# [1.6.0](https://github.com/Microck/discord.py-self-mcp/compare/v1.5.1...v1.6.0) (2026-08-23)
+
+
+### Features
+
+* submit modals and reach ephemeral interaction replies ([#46](https://github.com/Microck/discord.py-self-mcp/issues/46)) ([0133433](https://github.com/Microck/discord.py-self-mcp/commit/01334336b3beb2177472ff5216bcdd78845967e5))
+
+## [1.5.1](https://github.com/Microck/discord.py-self-mcp/compare/v1.5.0...v1.5.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* pin mcp<2 so the server starts on a fresh install ([#44](https://github.com/Microck/discord.py-self-mcp/issues/44)) ([6bb124d](https://github.com/Microck/discord.py-self-mcp/commit/6bb124dc026b82e6f5f177fcb4d5d55d6ffe2780))
+
+# [1.5.0](https://github.com/Microck/discord.py-self-mcp/compare/v1.4.1...v1.5.0) (2026-08-04)
+
+
+### Features
+
+* role and permission management tools ([#45](https://github.com/Microck/discord.py-self-mcp/issues/45)) ([071fb89](https://github.com/Microck/discord.py-self-mcp/commit/071fb89931de70437e8935e93f8c3977224e7d5f)), closes [#5865F2](https://github.com/Microck/discord.py-self-mcp/issues/5865F2)
+
+## [1.4.1](https://github.com/Microck/discord.py-self-mcp/compare/v1.4.0...v1.4.1) (2026-06-18)
+
+
+### Bug Fixes
+
+* accept discrawl.exe on Windows + list_friends Relationship crash ([#43](https://github.com/Microck/discord.py-self-mcp/issues/43)) ([0897565](https://github.com/Microck/discord.py-self-mcp/commit/0897565c81b3c6c26444e8e290b540ccb287bb8d))
+
+# [1.4.0](https://github.com/Microck/discord.py-self-mcp/compare/v1.3.0...v1.4.0) (2026-06-12)
+
+
+### Features
+
+* reply_to_message_id on send_message + reply id in read_messages ([#42](https://github.com/Microck/discord.py-self-mcp/issues/42)) ([c5b768f](https://github.com/Microck/discord.py-self-mcp/commit/c5b768f64844dd4b2efc685d649775ce1832bad6))
+
+# [1.3.0](https://github.com/Microck/discord.py-self-mcp/compare/v1.2.8...v1.3.0) (2026-06-05)
+
+
+### Bug Fixes
+
+* use Microck discrawl-self fork by default ([116728c](https://github.com/Microck/discord.py-self-mcp/commit/116728cb53adeae037d2822efe5d63e57f48da53))
+
+
+### Features
+
+* reliable slash-command resolution + list_dm_channels tool ([20d8ddd](https://github.com/Microck/discord.py-self-mcp/commit/20d8ddddf5d97af752107614695af7380025759b))
+
+## [1.2.8](https://github.com/Microck/discord.py-self-mcp/compare/v1.2.7...v1.2.8) (2026-04-25)
+
+
+### Bug Fixes
+
+* expose message attachments in daemon cli ([2a5ecfd](https://github.com/Microck/discord.py-self-mcp/commit/2a5ecfd6a0a875c20295d65f99e37a3f8e21e3d8))
+
+## [1.2.7](https://github.com/Microck/discord.py-self-mcp/compare/v1.2.6...v1.2.7) (2026-04-23)
+
+
+### Bug Fixes
+
+* harden rate limiting and thread parity ([71e5a87](https://github.com/Microck/discord.py-self-mcp/commit/71e5a871d0228d4beabd748d742ceadde3100cf8))
+
+## [1.2.6](https://github.com/Microck/discord.py-self-mcp/compare/v1.2.5...v1.2.6) (2026-04-17)
+
+
+### Bug Fixes
+
+* harden daemon runtime and align tool behavior ([4708265](https://github.com/Microck/discord.py-self-mcp/commit/47082654530b866af8cb4ded705e531e76c8b71f))
+
+## [1.2.5](https://github.com/Microck/discord.py-self-mcp/compare/v1.2.4...v1.2.5) (2026-04-17)
+
+
+### Bug Fixes
+
+* add attachment access for message media ([b270b61](https://github.com/Microck/discord.py-self-mcp/commit/b270b613c538e6ef9177b7caa2e954b32d3c73a7)), closes [#16](https://github.com/Microck/discord.py-self-mcp/issues/16)
+
+## [1.2.4](https://github.com/Microck/discord.py-self-mcp/compare/v1.2.3...v1.2.4) (2026-04-17)
+
+
+### Bug Fixes
+
+* improve token extraction with localStorage fallback ([36eb54a](https://github.com/Microck/discord.py-self-mcp/commit/36eb54afd6ec1b2fb687424aa6e934ffd17eb6dd))
+
+## [1.2.3](https://github.com/Microck/discord.py-self-mcp/compare/v1.2.2...v1.2.3) (2026-04-11)
+
+
+### Bug Fixes
+
+* **server:** harden startup and role handling ([c4a6b31](https://github.com/Microck/discord.py-self-mcp/commit/c4a6b315c3f66866227d4135dab8bcd2670fa30e))
+* **server:** harden startup and role handling ([7ba517c](https://github.com/Microck/discord.py-self-mcp/commit/7ba517c5514b4236d9bde2eed79fb3efc8ad624c))
+
+## [1.2.2](https://github.com/Microck/discord.py-self-mcp/compare/v1.2.1...v1.2.2) (2026-04-11)
+
+
+### Bug Fixes
+
+* **release:** align node auth env ([16e899e](https://github.com/Microck/discord.py-self-mcp/commit/16e899e32a9b75469225bc3b49f55c7c686b921d))
+* **release:** keep npm token fallback ([9b59b48](https://github.com/Microck/discord.py-self-mcp/commit/9b59b485885b6bf1b1690e7d61e189b80cea9083))
+* **release:** use npm trusted publishing ([892102d](https://github.com/Microck/discord.py-self-mcp/commit/892102d63037539bc189eb1cbc04660464d4815b))
+
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## Unreleased
+
+### Features
+
+- Add read-only server-sidebar analysis, compact bulk channel listings, and representative message sampling for faster server classification.
+- Add atomic server-folder layout application with a dry-run plan and simplified named-folder reordering.
+- Add an optional localhost-only Streamable HTTP transport while retaining the default stdio transport.
+
+### Safety
+
+- Preserve unlisted servers during folder-layout application and use Discord's settings data version to reject stale writes.
+- Log folder and sampling operations without recording message content, tokens, or other secrets.
+- Match Streamable HTTP Host and Origin validation to the selected loopback listener, including alternate loopback addresses.
+
+### Development
+
+- Add a GitHub Actions check that compiles the source, runs the tests, and builds a wheel for pull requests.
+
+## 1.2.1
+
+- Discrawl MCP tools now prefer a sibling `../discrawl-self/bin/discrawl` build before falling back to `discrawl` on `PATH`.
+- Updated README, SKILL, and `server.json` guidance to document the fork-first discrawl lookup and `DISCRAWL_BIN` override behavior.
+
+## 1.0.4
+
+- Setup wizards can update common MCP client config files (with backups).
+- Unified install guide and updated README/manual config templates.
+- Fixed npm setup wizard server key and expanded templates for python-only usage.
+- Added `GROQ_API_KEY` to `server.json` environment variable hints.
