@@ -63,3 +63,7 @@ test_*.py
 ralph-loop.local.md
 AGENTS.md
 *.tgz
+
+# OpenCode configs may contain MCP credentials; keep local only
+opencode.json
+opencode.jsonc
