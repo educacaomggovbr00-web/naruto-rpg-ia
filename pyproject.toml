@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "discord-py-self-mcp"
+  version = "1.8.1"
+authors = [
+  { name="Microck", email="your.email@example.com" },
+]
+description = "A Discord Selfbot MCP server using discord.py-self"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "discord.py-self[voice]==2.1.0",
+    "discord-protos==0.0.2",
+    "mcp<2",
+    "python-dotenv",
+    "playwright",
+    "hcaptcha-challenger",
+    "loguru",
+    "audioop-lts; python_version >= '3.13'",
+    "camoufox[geoip]",
+    "tls-client",
+    "httpx",
+    "pyjwt",
+    "colorama",
+    "numpy",
+    "scipy",
+    "requests"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=9.0",
+    "pytest-asyncio>=1.0",
+]
+
+[project.scripts]
+discord-py-self-mcp = "discord_py_self_mcp.main:main"
+discord-py-self-mcp-setup = "discord_py_self_mcp.setup:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
