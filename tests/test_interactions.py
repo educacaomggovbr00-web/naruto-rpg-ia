@@ -1,4 +1,6 @@
 import asyncio
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import discord
 import pytest
@@ -44,6 +46,7 @@ class FakeSlashCommand:
             FakeSubCommand(c["name"]) for c in data.get("children", [])
         ]
         self.application_id = data.get("application_id")
+        self.guild_id = data.get("guild_id")
         self.channel = channel
         self.called_with = None
 
@@ -71,10 +74,14 @@ class FakeSubCommand:
 
 
 class FakeChannel(discord.abc.Messageable):
-    def __init__(self, channel_id=1, recipient=None, search=None):
+    def __init__(self, channel_id=1, recipient=None, search=None, commands=()):
         self.id = channel_id
         self.recipient = recipient
         self._search = search or []
+        self._commands = commands
+
+    async def application_commands(self):
+        return self._commands
 
     async def _get_channel(self):
         return self
@@ -277,6 +284,187 @@ async def test_falls_back_to_search_without_app_id(monkeypatch):
     )
     assert result[0].text.startswith("Executed slash command: /foo")
     assert fake_cmd.called_with is not None
+
+
+NARUTO_APP_ID = "1515908078913192026"
+NARUTO_GUILD_ID = "1515877468299595919"
+
+
+@pytest.mark.parametrize("name", ["perfil", "mapa", "viajar"])
+async def test_naruto_guild_commands_use_same_index_as_listing(monkeypatch, name):
+    command = FakeSlashCommand(data={
+        "name": name, "application_id": NARUTO_APP_ID,
+        "guild_id": NARUTO_GUILD_ID,
+    })
+    # Another bot also exposes /perfil: explicit application_id must win.
+    other = FakeSlashCommand(data={"name": name, "application_id": "297153970613387264"})
+    channel = FakeChannel(commands=[other, command])
+    channel.guild = SimpleNamespace(id=int(NARUTO_GUILD_ID))
+    stub = FakeClient(channel=channel, commands=[])
+    stub.http.get_application_commands = AsyncMock(return_value=[])
+    monkeypatch.setattr(interactions, "client", stub)
+    monkeypatch.setattr(discord, "SlashCommand", FakeSlashCommand)
+
+    listing = await interactions.list_application_commands({"channel_id": "1"})
+    assert f"slash: '{name}' application_id={NARUTO_APP_ID}" in listing[0].text
+    result = await interactions.send_slash_command({
+        "channel_id": "1", "command_name": f"/{name}",
+        "application_id": NARUTO_APP_ID,
+    })
+    assert result[0].text.startswith(f"Executed slash command: /{name}")
+    assert command.called_with == (channel, {})
+    assert other.called_with is None
+    stub.http.get_application_commands.assert_not_awaited()
+
+
+async def test_guild_registration_overrides_global_for_same_app(monkeypatch):
+    global_command = FakeSlashCommand(data={"name": "mapa", "application_id": NARUTO_APP_ID})
+    guild_command = FakeSlashCommand(data={
+        "name": "mapa", "application_id": NARUTO_APP_ID, "guild_id": NARUTO_GUILD_ID,
+    })
+    channel = FakeChannel(commands=[global_command, guild_command])
+    channel.guild = SimpleNamespace(id=int(NARUTO_GUILD_ID))
+    monkeypatch.setattr(interactions, "client", FakeClient(channel=channel))
+    monkeypatch.setattr(discord, "SlashCommand", FakeSlashCommand)
+
+    result = await interactions.send_slash_command({
+        "channel_id": "1", "command_name": "mapa", "application_id": NARUTO_APP_ID,
+    })
+    assert result[0].text.startswith("Executed slash command")
+    assert guild_command.called_with is not None
+    assert global_command.called_with is None
+
+
+async def test_index_ambiguity_does_not_invoke_either_bot(monkeypatch):
+    commands = [FakeSlashCommand(data={"name": "perfil", "application_id": app})
+                for app in [NARUTO_APP_ID, "297153970613387264"]]
+    channel = FakeChannel(commands=commands)
+    monkeypatch.setattr(interactions, "client", FakeClient(channel=channel))
+    monkeypatch.setattr(discord, "SlashCommand", FakeSlashCommand)
+    result = await interactions.send_slash_command({"channel_id": "1", "command_name": "perfil"})
+    assert "Multiple commands" in result[0].text
+    assert all(c.called_with is None for c in commands)
+
+
+async def test_empty_global_listing_still_uses_search_with_app_filter(monkeypatch):
+    wrong = FakeSlashCommand(data={"name": "perfil", "application_id": "999"})
+    correct = FakeSlashCommand(data={"name": "perfil", "application_id": NARUTO_APP_ID})
+    channel = FakeChannel(search=[wrong, correct])
+    monkeypatch.setattr(interactions, "client", FakeClient(channel=channel, commands=[]))
+    monkeypatch.setattr(discord, "SlashCommand", FakeSlashCommand)
+    result = await interactions.send_slash_command({
+        "channel_id": "1", "command_name": "perfil", "application_id": NARUTO_APP_ID,
+    })
+    assert result[0].text.startswith("Executed slash command")
+    assert correct.called_with is not None
+    assert wrong.called_with is None
+
+
+async def test_inferred_dm_app_id_filters_search_fallback(monkeypatch):
+    wrong = FakeSlashCommand(data={"name": "perfil", "application_id": "999"})
+    channel = FakeChannel(recipient=FakeUser(int(NARUTO_APP_ID)), search=[wrong])
+    monkeypatch.setattr(interactions, "client", FakeClient(channel=channel))
+    monkeypatch.setattr(discord, "SlashCommand", FakeSlashCommand)
+    result = await interactions.send_slash_command({"channel_id": "1", "command_name": "perfil"})
+    assert "not found" in result[0].text
+    assert wrong.called_with is None
+
+
+async def test_index_failure_can_resolve_global_registration(monkeypatch):
+    channel = FakeChannel()
+    channel.application_commands = AsyncMock(side_effect=RuntimeError("index unavailable"))
+    stub = FakeClient(channel=channel, commands=[{
+        "name": "mapa", "application_id": NARUTO_APP_ID, "type": 1,
+    }])
+    monkeypatch.setattr(interactions, "client", stub)
+    monkeypatch.setattr(discord, "SlashCommand", FakeSlashCommand)
+    result = await interactions.send_slash_command({
+        "channel_id": "1", "command_name": "mapa", "application_id": NARUTO_APP_ID,
+    })
+    assert result[0].text.startswith("Executed slash command: /mapa")
+
+
+async def test_wrong_application_rejected_in_all_sources(monkeypatch):
+    wrong = FakeSlashCommand(data={"name": "perfil", "application_id": "999"})
+    channel = FakeChannel(commands=[wrong], search=[wrong])
+    stub = FakeClient(channel=channel, commands=[{
+        "name": "perfil", "application_id": "999", "type": 1,
+    }])
+    monkeypatch.setattr(interactions, "client", stub)
+    monkeypatch.setattr(discord, "SlashCommand", FakeSlashCommand)
+    result = await interactions.send_slash_command({
+        "channel_id": "1", "command_name": "perfil", "application_id": NARUTO_APP_ID,
+    })
+    assert "not found" in result[0].text
+    assert wrong.called_with is None
+
+
+@pytest.mark.parametrize("stage", ["channel", "index", "global", "search"])
+async def test_401_stops_lookup_without_further_requests(monkeypatch, stage):
+    error = discord.HTTPException(SimpleNamespace(status=401, reason="Unauthorized"), "Unauthorized")
+    channel = FakeChannel()
+    channel.application_commands = AsyncMock(return_value=[])
+    channel.slash_commands = AsyncMock(return_value=[])
+    stub = FakeClient(channel=channel)
+    stub.http.get_application_commands = AsyncMock(return_value=[])
+    if stage == "channel":
+        stub.get_channel = lambda channel_id: None
+        stub.fetch_channel = AsyncMock(side_effect=error)
+    elif stage == "index":
+        channel.application_commands.side_effect = error
+    elif stage == "global":
+        stub.http.get_application_commands.side_effect = error
+    else:
+        channel.slash_commands.side_effect = error
+    monkeypatch.setattr(interactions, "client", stub)
+
+    result = await interactions.send_slash_command({
+        "channel_id": "1", "command_name": "mapa", "application_id": NARUTO_APP_ID,
+    })
+    assert "401" in result[0].text
+    assert "not found" not in result[0].text
+    if stage == "channel":
+        channel.application_commands.assert_not_awaited()
+    if stage in ("channel", "index"):
+        stub.http.get_application_commands.assert_not_awaited()
+    if stage != "search":
+        channel.slash_commands.assert_not_called()
+
+
+async def test_real_library_index_retains_guild_scope_and_options(monkeypatch):
+    """Exercise discord.py-self's actual index parsing, with HTTP/invocation mocked."""
+    data = {
+        "id": "111", "version": "222", "name": "viajar", "description": "Viajar",
+        "type": 1, "application_id": NARUTO_APP_ID, "guild_id": NARUTO_GUILD_ID,
+        "options": [{"name": "destino", "description": "Destino", "type": 3, "required": True}],
+    }
+    http = SimpleNamespace(guild_application_command_index=AsyncMock(return_value={
+        "application_commands": [data], "applications": [],
+    }))
+    channel = FakeChannel()
+    channel.type = discord.ChannelType.text
+    channel.guild = SimpleNamespace(id=int(NARUTO_GUILD_ID))
+    channel._state = SimpleNamespace(http=http)
+    # Bypass only the fake's index; run the installed library's implementation.
+    channel.application_commands = lambda: discord.abc.Messageable.application_commands(channel)
+    stub = FakeClient(channel=channel)
+    stub.http.get_application_commands = AsyncMock(return_value=[])
+    invoke = AsyncMock(return_value=SimpleNamespace(id=12345))
+    monkeypatch.setattr(interactions, "client", stub)
+    monkeypatch.setattr(discord.SlashCommand, "__call__", invoke)
+
+    commands = await interactions._channel_commands(channel)
+    assert commands[0].guild_id == int(NARUTO_GUILD_ID)
+    assert commands[0].application_id == int(NARUTO_APP_ID)
+    assert commands[0].version == 222
+    assert commands[0].options[0].name == "destino"
+    result = await interactions.send_slash_command({
+        "channel_id": "1", "command_name": "viajar", "application_id": NARUTO_APP_ID,
+        "options": {"destino": "teste-local"},
+    })
+    assert result[0].text.startswith("Executed slash command: /viajar")
+    invoke.assert_awaited_once_with(channel, destino="teste-local")
+    stub.http.get_application_commands.assert_not_awaited()
 
 
 # --- Button / modal fakes ----------------------------------------------------

@@ -21,6 +21,14 @@
 
 ---
 
+## Retomada do RPG
+
+- [Henrique Shimura — Naruto Full Power](HISTORICO_FULL_POWER.md): ficha, cena atual, fontes consultadas e pendências.
+- [Sistemas do Full Power — conferência](SISTEMAS_FULL_POWER.md): regras verificadas, limites de leitura e fila dos canais restantes.
+- [Henrique Uchiha — Naruto Project](HISTORICO_RPG.md): histórico separado do outro servidor.
+
+Na retomada, conferir as mensagens novas antes de agir. Regras disponíveis não comprovam que o personagem já recebeu seus benefícios. As leituras do Discord têm janela limitada; consultar a cobertura registrada antes de afirmar que tudo foi lido.
+
 ## quick start
 
 this is a local mcp server (stdio transport). your mcp client spawns it as a process, and you provide secrets (like `DISCORD_TOKEN`) via the client's `env`/`environment` config.

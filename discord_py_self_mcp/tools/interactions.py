@@ -92,6 +92,38 @@ async def _collect_commands(result):
     return list(result)
 
 
+async def _channel_commands(channel):
+    """Use the same guild/DM command index for discovery and invocation."""
+    return await _collect_commands(channel.application_commands())
+
+
+def _matching_slash_commands(commands, channel, application_id, root_name):
+    matching = [
+        c for c in commands
+        if isinstance(c, discord.SlashCommand)
+        and c.name == root_name
+        and (
+            not application_id
+            or str(c.application_id) == str(application_id)
+        )
+    ]
+    guild_id = getattr(getattr(channel, "guild", None), "id", None)
+    guild_id = guild_id or getattr(channel, "guild_id", None)
+    if guild_id:
+        # A guild registration overrides the same app's global command, but
+        # must never hide another application's identically named command.
+        guild_apps = {
+            str(c.application_id) for c in matching
+            if str(getattr(c, "guild_id", None)) == str(guild_id)
+        }
+        matching = [
+            c for c in matching
+            if str(c.application_id) not in guild_apps
+            or str(getattr(c, "guild_id", None)) == str(guild_id)
+        ]
+    return matching
+
+
 def _infer_application_id(channel, application_id):
     """Resolve the application id to use for command lookup.
 
@@ -110,16 +142,18 @@ async def _resolve_via_application(channel, application_id, root_name):
     """Resolve a root SlashCommand by listing the application's registered
     commands (GET /applications/{id}/commands).
 
-    This is the reliable path for guild-installed bots: the per-channel "/"
-    command search index (application-commands/search) returns nothing for many
-    of them, even though their commands work in the Discord client and are
-    fully invokable. Returns (command_or_None, available_command_names).
+    This endpoint contains global registrations only. Guild registrations are
+    resolved through the channel's application_commands() index first.
+    Returns (command_or_None, available_command_names).
     """
     raw = await client.http.get_application_commands(int(application_id))
     if not isinstance(raw, list):
         return None, []
     # type 1 == CHAT_INPUT (slash). 2/3 are user/message context-menu commands.
-    chat_input = [c for c in raw if c.get("type", 1) == 1]
+    chat_input = [
+        c for c in raw if c.get("type", 1) == 1
+        and str(c.get("application_id", "")) == str(application_id)
+    ]
     names = [c.get("name") for c in chat_input if c.get("name")]
     match = next((c for c in chat_input if c.get("name") == root_name), None)
     if not match:
@@ -140,15 +174,7 @@ async def _resolve_via_search(channel, application_id, root_name):
     slash_commands = getattr(channel, "slash_commands", None)
     if callable(slash_commands):
         commands = await _collect_commands(slash_commands(query=root_name))
-    commands = [c for c in commands if isinstance(c, discord.SlashCommand)]
-    matching = [c for c in commands if getattr(c, "name", None) == root_name]
-    if application_id:
-        matching = [
-            c
-            for c in matching
-            if str(getattr(c, "application_id", "")) == str(application_id)
-        ]
-    return matching
+    return _matching_slash_commands(commands, channel, application_id, root_name)
 
 
 @registry.register(
@@ -193,7 +219,9 @@ async def send_slash_command(arguments: dict):
         if not channel:
             try:
                 channel = await client.fetch_channel(channel_id)
-            except Exception:
+            except Exception as e:
+                if getattr(e, "status", None) == 401:
+                    raise
                 channel = None
         if not channel:
             return [TextContent(type="text", text="Channel not found")]
@@ -207,29 +235,40 @@ async def send_slash_command(arguments: dict):
         root_name = parts[0]
         subcommand_parts = parts[1:]
 
-        # Resolve the root command. Prefer the application command listing when an
-        # application id is known (explicit or inferred from a bot DM); fall back
-        # to the channel "/" search index only when there is no app id or the
-        # listing failed.
+        # Resolve from the same index used by list_application_commands. Unlike
+        # the global-only endpoint, this includes guild registrations and keeps
+        # the library's command metadata (scope, version, application, options).
         resolved_app_id = _infer_application_id(channel, application_id)
         target_command = None
         available_names = []
         app_error = None
-        app_listed = False
+        matching = []
+        try:
+            commands = await _channel_commands(channel)
+            matching = _matching_slash_commands(
+                commands, channel, resolved_app_id, root_name
+            )
+        except Exception as e:
+            if getattr(e, "status", None) == 401:
+                raise
+            app_error = f"{type(e).__name__}: {e}"
 
-        if resolved_app_id:
+        if not matching and resolved_app_id:
             try:
                 target_command, available_names = await _resolve_via_application(
                     channel, resolved_app_id, root_name
                 )
-                app_listed = True
             except Exception as e:
+                if getattr(e, "status", None) == 401:
+                    raise
                 app_error = f"{type(e).__name__}: {e}"
 
-        if target_command is None and not app_listed:
+        if target_command is None and not matching:
             try:
-                matching = await _resolve_via_search(channel, application_id, root_name)
+                matching = await _resolve_via_search(channel, resolved_app_id, root_name)
             except Exception as e:
+                if getattr(e, "status", None) == 401:
+                    raise
                 detail = app_error or f"{type(e).__name__}: {e}"
                 return [
                     TextContent(
@@ -237,21 +276,22 @@ async def send_slash_command(arguments: dict):
                         text=f"Could not fetch commands for '/{root_name}': {detail}",
                     )
                 ]
-            if len(matching) > 1 and not application_id:
-                choices = ", ".join(
-                    f"{c.name} (app_id={getattr(c, 'application_id', 'unknown')})"
-                    for c in matching
+        if len(matching) > 1:
+            choices = ", ".join(
+                f"{c.name} (app_id={getattr(c, 'application_id', 'unknown')})"
+                for c in matching
+            )
+            return [
+                TextContent(
+                    type="text",
+                    text=(
+                        f"Multiple commands named '{root_name}' found. Provide "
+                        f"application_id. Options: {choices}"
+                    ),
                 )
-                return [
-                    TextContent(
-                        type="text",
-                        text=(
-                            f"Multiple commands named '{root_name}' found. Provide "
-                            f"application_id. Options: {choices}"
-                        ),
-                    )
-                ]
-            target_command = matching[0] if matching else None
+            ]
+        if matching:
+            target_command = matching[0]
 
         if target_command is None:
             if available_names:
@@ -536,7 +576,7 @@ async def list_application_commands(arguments: dict):
             return error
 
         kind = arguments.get("kind") or "all"
-        commands = await _collect_commands(channel.application_commands())
+        commands = await _channel_commands(channel)
 
         lines = []
         for command in commands:
